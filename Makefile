@@ -230,6 +230,7 @@ LEGAL_REPORT = $(LEGAL_INFO_DIR)/README
 CPE_UPDATES_DIR = $(BASE_DIR)/cpe-updates
 
 BR2_CONFIG = $(CONFIG_DIR)/.config
+BR2_UBOOT_CONFIG = $(CONFIG_DIR)/output/build/uboot-custom/.config
 
 # Pull in the user's configuration file
 ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
@@ -485,6 +486,7 @@ endif
 # Scripts in support/ or post-build scripts may need to reference
 # these locations, so export them so it is easier to use
 export BR2_CONFIG
+export BR2_UBOOT_CONFIG
 export BR2_REPRODUCIBLE
 export TARGET_DIR
 export STAGING_DIR

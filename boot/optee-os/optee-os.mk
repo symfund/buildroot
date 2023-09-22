@@ -13,7 +13,12 @@ endif
 OPTEE_OS_INSTALL_STAGING = YES
 OPTEE_OS_INSTALL_IMAGES = YES
 
-ifeq ($(BR2_TARGET_OPTEE_OS_CUSTOM_TARBALL),y)
+ifeq ($(BR2_TARGET_OPTEE_OS_MA35D1_TARBALL),y)
+OPTEE_OS_TARBALL = $(call github,OpenNuvoton,MA35D1_optee_os-v3.9.0,$(OPTEE_OS_VERSION))/MA35D1_optee_os-v3.9.0-$(OPTEE_OS_VERSION).tar.gz
+OPTEE_OS_SITE = $(patsubst %/,%,$(dir $(OPTEE_OS_TARBALL)))
+OPTEE_OS_SOURCE = $(notdir $(OPTEE_OS_TARBALL))
+BR_NO_CHECK_HASH_FOR += $(OPTEE_OS_SOURCE)
+else ifeq ($(BR2_TARGET_OPTEE_OS_CUSTOM_TARBALL),y)
 OPTEE_OS_TARBALL = $(call qstrip,$(BR2_TARGET_OPTEE_OS_CUSTOM_TARBALL_LOCATION))
 OPTEE_OS_SITE = $(patsubst %/,%,$(dir $(OPTEE_OS_TARBALL)))
 OPTEE_OS_SOURCE = $(notdir $(OPTEE_OS_TARBALL))
@@ -61,6 +66,11 @@ OPTEE_OS_MAKE_OPTS += \
 	CFG_ARM32_core=y
 endif
 
+ifneq ($(call findstring,custom,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME)),)
+SBASE0=$(shell expr $(shell printf "%d\n" ${TFA_CUSTOM_DDR_SIZE}) \+ $(shell printf "%d\n" 0x7F800000))
+SBASE1=$(shell expr $(shell printf "%d\n" ${TFA_CUSTOM_DDR_SIZE}) \+ $(shell printf "%d\n" 0x7FF00000))
+endif
+
 # Get mandatory PLAFORM and optional PLATFORM_FLAVOR and additional
 # variables
 OPTEE_OS_MAKE_OPTS += PLATFORM=$(call qstrip,$(BR2_TARGET_OPTEE_OS_PLATFORM))
@@ -68,6 +78,26 @@ ifneq ($(call qstrip,$(BR2_TARGET_OPTEE_OS_PLATFORM_FLAVOR)),)
 OPTEE_OS_MAKE_OPTS += PLATFORM_FLAVOR=$(call qstrip,$(BR2_TARGET_OPTEE_OS_PLATFORM_FLAVOR))
 endif
 OPTEE_OS_MAKE_OPTS += $(call qstrip,$(BR2_TARGET_OPTEE_OS_ADDITIONAL_VARIABLES))
+
+
+# OPTEE-OS for ma35d1
+ifeq ($(call qstrip,$(BR2_TARGET_OPTEE_OS_PLATFORM)),nuvoton)
+ifeq ($(call qstrip,$(BR2_TARGET_OPTEE_OS_ADDITIONAL_VARIABLES=)),)
+ifneq ($(call findstring,128,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME)),)
+	OPTEE_OS_MAKE_OPTS += CFG_TZDRAM_START=0x87800000 CFG_SHMEM_START=0x87F00000
+else ifneq ($(call findstring,256,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME)),)
+	OPTEE_OS_MAKE_OPTS += CFG_TZDRAM_START=0x8F800000 CFG_SHMEM_START=0x8FF00000
+else ifneq ($(call findstring,512,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME)),)
+	OPTEE_OS_MAKE_OPTS += CFG_TZDRAM_START=0x9F800000 CFG_SHMEM_START=0x9FF00000
+else ifneq ($(call findstring,1g,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME)),)
+        OPTEE_OS_MAKE_OPTS += CFG_TZDRAM_START=0xAF800000 CFG_SHMEM_START=0xAFF00000
+else ifneq ($(call findstring,custom,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME)),)
+	OPTEE_OS_MAKE_OPTS += CFG_TZDRAM_START=$(SBASE0) CFG_SHMEM_START=$(SBASE1)
+else
+	OPTEE_OS_MAKE_OPTS += CFG_TZDRAM_START=0xFF800000 CFG_SHMEM_START=0xFFF00000
+endif
+endif
+endif
 
 # Requests OP-TEE OS to build from subdirectory out/ of its sourcetree
 # root path otherwise the output directory path depends on the target

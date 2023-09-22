@@ -21,6 +21,14 @@ ifeq ($(BR2_LINUX_KERNEL_CUSTOM_TARBALL),y)
 LINUX_TARBALL = $(call qstrip,$(BR2_LINUX_KERNEL_CUSTOM_TARBALL_LOCATION))
 LINUX_SITE = $(patsubst %/,%,$(dir $(LINUX_TARBALL)))
 LINUX_SOURCE = $(notdir $(LINUX_TARBALL))
+else ifeq ($(BR2_LINUX_KERNEL_MA35D1_5_10_VERSION),y)
+LINUX_TARBALL = $(call github,OpenNuvoton,MA35D1_linux-5.10.y,$(call qstrip,$(BR2_TARGET_KERNEL_MA35D1_VERSION)))/MA35D1_linux-5.10.y-$(call qstrip,$(BR2_TARGET_KERNEL_MA35D1_VERSION)).tar.gz
+LINUX_SITE = $(patsubst %/,%,$(dir $(LINUX_TARBALL)))
+LINUX_SOURCE = $(notdir $(LINUX_TARBALL))
+else ifeq ($(BR2_LINUX_KERNEL_MA35D1_5_4_VERSION),y)
+LINUX_TARBALL = $(call github,OpenNuvoton,MA35D1_linux-5.4.y,$(call qstrip,$(BR2_TARGET_KERNEL_MA35D1_VERSION)))/MA35D1_linux-5.4.y-$(call qstrip,$(BR2_TARGET_KERNEL_MA35D1_VERSION)).tar.gz
+LINUX_SITE = $(patsubst %/,%,$(dir $(LINUX_TARBALL)))
+LINUX_SOURCE = $(notdir $(LINUX_TARBALL))
 else ifeq ($(BR2_LINUX_KERNEL_CUSTOM_GIT),y)
 LINUX_SITE = $(call qstrip,$(BR2_LINUX_KERNEL_CUSTOM_REPO_URL))
 LINUX_SITE_METHOD = git
@@ -433,6 +441,18 @@ LINUX_DEPENDENCIES += host-bison host-flex
 
 ifeq ($(BR2_LINUX_KERNEL_DTB_IS_SELF_BUILT),)
 define LINUX_BUILD_DTB
+	$(TOPDIR)/linux/dts-reserve \
+		$(LINUX_ARCH_PATH)/boot/dts/nuvoton/ma35d1.dtsi
+	$(if $(BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_A35),$(TOPDIR)/linux/dts-reserve \
+		$(LINUX_ARCH_PATH)/boot/dts/nuvoton/ma35d1.dtsi \
+		$(strip $(BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_A35_BASE)) \
+		$(strip $(BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_A35_LEN)))
+	$(TOPDIR)/linux/dts-reserve \
+		 $(LINUX_ARCH_PATH)/boot/dts/$(addsuffix .dts,$(LINUX_DTS_NAME))
+	$(if $(BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_A35),$(TOPDIR)/linux/dts-reserve \
+		$(LINUX_ARCH_PATH)/boot/dts/$(addsuffix .dts,$(LINUX_DTS_NAME)) \
+		$(strip $(BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_A35_BASE)) \
+		$(strip $(BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_A35_LEN)))
 	$(LINUX_MAKE_ENV) $(MAKE) $(LINUX_MAKE_FLAGS) -C $(@D) $(LINUX_DTBS)
 endef
 ifeq ($(BR2_LINUX_KERNEL_APPENDED_DTB),)
@@ -486,10 +506,22 @@ endif
 # The call to disable gcc-plugins is a stop-gap measure:
 #   http://lists.busybox.net/pipermail/buildroot/2020-May/282727.html
 define LINUX_BUILD_CMDS
+	$(if $(BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_A35), \
+	$(call KCONFIG_ENABLE_OPT,CONFIG_COMMON_CLK_FIXED_UNUSED), \
+	$(call KCONFIG_DISABLE_OPT,CONFIG_COMMON_CLK_FIXED_UNUSED))
 	$(call KCONFIG_DISABLE_OPT,CONFIG_GCC_PLUGINS)
 	$(foreach dts,$(call qstrip,$(BR2_LINUX_KERNEL_CUSTOM_DTS_PATH)), \
 		cp -f $(dts) $(LINUX_ARCH_PATH)/boot/dts/
 	)
+	if grep -q "CONFIG_ARCH_NUC980=y" $(@D)/.config; then  \
+		mkdir -p $(@D)/../image; \
+	fi
+	if grep -q "CONFIG_ARCH_NUC970=y" $(@D)/.config; then  \
+		mkdir -p $(@D)/../image; \
+	fi
+	if grep -q "BR2_TARGET_OPTEE_OS=y" .config; then \
+		cat board/nuvoton/ma35d1/optee.config >> $(@D)/.config; \
+	fi
 	$(LINUX_MAKE_ENV) $(MAKE) $(LINUX_MAKE_FLAGS) -C $(@D) all
 	$(LINUX_MAKE_ENV) $(MAKE) $(LINUX_MAKE_FLAGS) -C $(@D) $(LINUX_TARGET_NAME)
 	$(LINUX_BUILD_DTB)
@@ -508,6 +540,18 @@ else
 # build process.
 define LINUX_INSTALL_IMAGE
 	$(INSTALL) -m 0644 -D $(LINUX_IMAGE_PATH) $(1)/$(notdir $(LINUX_IMAGE_NAME))
+	if grep -q "CONFIG_ARCH_NUC980=y" $(LINUX_DIR)/.config; then \
+		$(INSTALL) -m 0644 -D $(LINUX_DIR)/../image/980image $(1)/; \
+		$(INSTALL) -m 0644 -D $(LINUX_DIR)/../image/*.dtb $(1)/; \
+	fi
+	if grep -q "CONFIG_ARCH_NUC970=y" $(LINUX_DIR)/.config; then \
+	$(INSTALL) -m 0644 -D $(LINUX_DIR)/../image/*.dtb $(1)/; \
+	if grep -q "CONFIG_CPU_N9H30=y" $(LINUX_DIR)/.config; then \
+		$(INSTALL) -m 0644 -D $(LINUX_DIR)/../image/n9h30image $(1)/; \
+	else \
+		$(INSTALL) -m 0644 -D $(LINUX_DIR)/../image/970image $(1)/; \
+	fi \
+	fi
 endef
 endif
 

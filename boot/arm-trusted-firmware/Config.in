@@ -8,6 +8,141 @@ config BR2_TARGET_ARM_TRUSTED_FIRMWARE
 	  https://github.com/ARM-software/arm-trusted-firmware
 
 if BR2_TARGET_ARM_TRUSTED_FIRMWARE
+
+config BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_SCP_BL2
+        bool "Add SCP BL2 image into FIP Image"
+        help
+          Add SCP_BL2 image into FIP Image
+
+if BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_SCP_BL2
+
+choice
+	prompt "Load Image into FIP Image"
+config BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_M4
+	bool "RTP M4 Image"
+	depends on BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_SCP_BL2
+	help
+          Add RTP m4 binary file into FIP Image
+
+config BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_A35
+        bool "A35 image"
+        depends on BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_SCP_BL2
+        help
+          Add A35 binary file into FIP Image
+
+endchoice
+
+config BR2_TARGET_ARM_TRUSTED_FIRMWARE_SCP_URL
+	string "SCP_BL2 binary file names"
+	default "RTP-BSP/Template.bin" if BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_M4
+	default "AmpCore1.bin" if BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_A35
+	help
+	  Name of binary file.
+endif
+
+if BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_A35
+
+config BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_A35_BASE
+        string "The execution address of CORE1"
+        default "0x88000000"
+
+config BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_A35_LEN
+        string "The execution size of CORE1"
+        default "0x2000000"
+
+endif
+
+choice
+        prompt "MA35D1 PMIC Select"
+config TFA_MA35D1_PMIC_0
+        bool "No PMIC"
+config TFA_MA35D1_PMIC_1
+        bool "DIALOG PMIC"
+config TFA_MA35D1_PMIC_2
+        bool "IP6103 PMIC"
+config TFA_MA35D1_PMIC_3
+        bool "APW7704F PMIC"
+endchoice
+
+if !TFA_MA35D1_PMIC_0
+config TFA_MA35D1_CPU_CORE_POWER
+        int "MA35D1 CPU Core Power"
+        default 125
+        help
+          The cpu core power voltage
+          decimal integer value.
+          125 = 1.25V, 120 = 1.20V,
+          1xx = 1.xxV, etc.
+endif
+
+choice
+        prompt "In-tree Device Tree Source file names"
+config TFA_CPU800_WB128M
+        bool "ma35d1-cpu800-wb-128m"
+config TFA_CPU800_WB256M
+        bool "ma35d1-cpu800-wb-256m"
+config TFA_CPU800_WB512M
+        bool "ma35d1-cpu800-wb-512m"
+config TFA_CPU800_WB1G
+        bool "ma35d1-cpu800-wb-1g"
+config TFA_CPU800_WB2G
+        bool "ma35d1-cpu800-wb-2g"
+config TFA_CPU1G_WB256M
+        bool "ma35d1-cpu1g-wb-256m"
+config TFA_CPU1G_WB512M
+        bool "ma35d1-cpu1g-wb-512m"
+config TFA_CPU1G_WB1G
+        bool "ma35d1-cpu1g-wb-1g"
+config TFA_CPU1G_WB2G
+        bool "ma35d1-cpu1g-wb-2g"
+config TFA_CPU800_MC1G
+        bool "ma35d1-cpu800-mc-1g"
+config TFA_CPU1G_MC1G
+        bool "ma35d1-cpu1g-mc-1g"
+config TFA_CPU800_CUSTOM_DDR
+        bool "ma35d1-cpu800-custom-ddr"
+config TFA_CPU1G_CUSTOM_DDR
+        bool "ma35d1-cpu1g-custom-ddr"
+endchoice
+
+config BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME
+	string
+	default "ma35d1-cpu800-wb-128m" if TFA_CPU800_WB128M
+	default "ma35d1-cpu800-wb-256m" if TFA_CPU800_WB256M
+	default "ma35d1-cpu800-wb-512m" if TFA_CPU800_WB512M
+	default "ma35d1-cpu1g-wb-256m" if TFA_CPU1G_WB256M
+	default "ma35d1-cpu1g-wb-512m" if TFA_CPU1G_WB512M
+	default "ma35d1-cpu800-mc-1g" if TFA_CPU800_MC1G
+	default "ma35d1-cpu1g-mc-1g" if TFA_CPU1G_MC1G
+	default "ma35d1-cpu800-custom-ddr" if TFA_CPU800_CUSTOM_DDR
+        default "ma35d1-cpu1g-custom-ddr" if TFA_CPU1G_CUSTOM_DDR
+	help
+	  Name of in-tree device tree source file, without
+	  the trailing .dts. You can provide a list of
+	  dts files to build, separated by spaces.
+
+	  The currently provided device tree of TF-A are as follows:
+		- ma35d1-cpu800-wb-128m
+		- ma35d1-cpu800-wb-256m
+		- ma35d1-cpu800-wb-512m
+		- ma35d1-cpu1g-wb-256m
+		- ma35d1-cpu1g-wb-512m
+
+		- ma35d1-cpu800-mc-1g
+		- ma35d1-cpu1g-mc-1g
+		- ma35d1-cpu800-custom-ddr
+		- ma35d1-cpu1g-custom-ddr
+
+if (TFA_CPU800_CUSTOM_DDR || TFA_CPU1G_CUSTOM_DDR)
+config BR2_TARGET_ARM_TRUSTED_FIRMWARE_CUSTOM_DDR
+	string "Custom DDR header file in board/nuvoton/ma35d1/ddr"
+	default "custom_ddr.h"
+
+config TFA_CUSTOM_DDR_SIZE
+	string "Custom DDR size"
+	default "0x10000000"
+endif
+
 choice
 	prompt "ATF Version"
 	help

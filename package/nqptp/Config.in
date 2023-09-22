@@ -1,0 +1,6 @@
+config BR2_PACKAGE_NQPTP
+	bool "nqptp"
+	help
+	  NQPTP - Not Quite PTP
+
+	  https://github.com/mikebrady/nqptp

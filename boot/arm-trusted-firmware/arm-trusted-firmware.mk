@@ -35,6 +35,10 @@ ifeq ($(BR2_TARGET_ARM_TRUSTED_FIRMWARE_NEEDS_DTC),y)
 ARM_TRUSTED_FIRMWARE_DEPENDENCIES += host-dtc
 endif
 
+ifeq ($(BR2_TARGET_MA35D1_SECURE_BOOT),y)
+ARM_TRUSTED_FIRMWARE_DEPENDENCIES += host-python3 host-python3-nuwriter host-jq host-m4-bsp
+endif
+
 ifeq ($(BR2_TARGET_ARM_TRUSTED_FIRMWARE_NEEDS_ARM32_TOOLCHAIN),y)
 ARM_TRUSTED_FIRMWARE_DEPENDENCIES += host-arm-gnu-toolchain
 endif
@@ -91,12 +95,20 @@ else ifeq ($(BR2_aarch64),y)
 ARM_TRUSTED_FIRMWARE_MAKE_OPTS += ARCH=aarch64
 endif
 
+ifneq ($(call findstring,custom,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME)),)
+DSIZE=$(shell expr $(shell printf "%d\n" $(TFA_CUSTOM_DDR_SIZE)) - $(shell printf "%d\n" 0x800000))
+SBASE=$(shell expr $(shell printf "%d\n" $(TFA_CUSTOM_DDR_SIZE)) + $(shell printf "%d\n" 0x7F800000))
+endif
+
 ifeq ($(BR2_TARGET_ARM_TRUSTED_FIRMWARE_BL32_OPTEE),y)
 ARM_TRUSTED_FIRMWARE_DEPENDENCIES += optee-os
 ARM_TRUSTED_FIRMWARE_MAKE_OPTS += \
 	BL32=$(BINARIES_DIR)/tee-header_v2.bin \
 	BL32_EXTRA1=$(BINARIES_DIR)/tee-pager_v2.bin \
 	BL32_EXTRA2=$(BINARIES_DIR)/tee-pageable_v2.bin
+ARM_TRUSTED_FIRMWARE_FIP_OPTS += \
+	--tos-fw $(BINARIES_DIR)/fip/enc_tee-header_v2.bin \
+	--tos-fw-extra1 $(BINARIES_DIR)/fip/enc_tee-pager_v2.bin
 ifeq ($(BR2_aarch64),y)
 ARM_TRUSTED_FIRMWARE_MAKE_OPTS += SPD=opteed
 endif
@@ -118,6 +130,7 @@ ifeq ($(BR2_TARGET_ARM_TRUSTED_FIRMWARE_UBOOT_AS_BL33),y)
 ARM_TRUSTED_FIRMWARE_UBOOT_BIN = $(call qstrip,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_UBOOT_BL33_IMAGE))
 ARM_TRUSTED_FIRMWARE_MAKE_OPTS += BL33=$(BINARIES_DIR)/$(ARM_TRUSTED_FIRMWARE_UBOOT_BIN)
 ARM_TRUSTED_FIRMWARE_DEPENDENCIES += uboot
+ARM_TRUSTED_FIRMWARE_FIP_OPTS += --nt-fw $(BINARIES_DIR)/fip/enc_u-boot.bin
 endif
 
 ifeq ($(BR2_TARGET_VEXPRESS_FIRMWARE),y)
@@ -128,6 +141,12 @@ endif
 ifeq ($(BR2_TARGET_BINARIES_MARVELL),y)
 ARM_TRUSTED_FIRMWARE_MAKE_OPTS += SCP_BL2=$(BINARIES_DIR)/scp-fw.bin
 ARM_TRUSTED_FIRMWARE_DEPENDENCIES += binaries-marvell
+endif
+
+ifeq ($(BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_SCP_BL2),y)
+ARM_TRUSTED_FIRMWARE_DEPENDENCIES += host-m4-bsp
+ARM_TRUSTED_FIRMWARE_MAKE_OPTS += SCP_BL2=$(BINARIES_DIR)/$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_SCP_URL) NEED_SCP_BL2=yes
+ARM_TRUSTED_FIRMWARE_FIP_OPTS += --scp-fw ${BINARIES_DIR}/fip/enc_rtp.bin
 endif
 
 ifeq ($(BR2_TARGET_MV_DDR_MARVELL),y)
@@ -151,7 +170,15 @@ define ARM_TRUSTED_FIRMWARE_BUILD_FIPTOOL
 			CPPFLAGS="$(HOST_CPPFLAGS)" \
 			LDLIBS="$(HOST_LDFLAGS) -lcrypto" ; \
 	fi
+
+	if [ "${TFA_CPU800_CUSTOM_DDR}" == "y" ] || [ "${TFA_CPU1G_CUSTOM_DDR}" == "y" ]; then \
+		cp $(BASE_DIR)/../board/nuvoton/ma35d1/ddr/$(call qstrip,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_CUSTOM_DDR)) $(@D)/plat/$(call qstrip,$(BR2_TARGET_OPTEE_OS_PLATFORM))/$(call qstrip,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_PLATFORM))/include/custom_ddr.h; \
+	fi
 endef
+endif
+
+ifeq ($(BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_A35),y)
+ARM_TRUSTED_FIRMWARE_MAKE_OPTS += MA35D1_SCPBL2_BASE=$(call qstrip,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_A35_BASE))
 endif
 
 ifeq ($(BR2_TARGET_ARM_TRUSTED_FIRMWARE_RCW),y)
@@ -162,6 +189,7 @@ endif
 
 ifeq ($(BR2_TARGET_ARM_TRUSTED_FIRMWARE_BL31),y)
 ARM_TRUSTED_FIRMWARE_MAKE_TARGETS += bl31
+ARM_TRUSTED_FIRMWARE_FIP_OPTS += --soc-fw $(BINARIES_DIR)/fip/enc_bl31.bin
 endif
 
 ifeq ($(BR2_TARGET_ARM_TRUSTED_FIRMWARE_BL31_UBOOT),y)
@@ -190,8 +218,134 @@ define ARM_TRUSTED_FIRMWARE_BL31_UBOOT_INSTALL_ELF
 endef
 endif
 
+ifeq ($(BR2_TARGET_ARM_TRUSTED_FIRMWARE_NEEDS_DTC),y)
+ifeq ($(call qstrip,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME))),)
+$(error No dts. Please check BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME))
+endif
+define ARM_TRUSTED_FIRMWARE_BL2_DTB_INSTALL
+	$(INSTALL) -D -m 0644 $(ARM_TRUSTED_FIRMWARE_IMG_DIR)/fdts/$(call qstrip,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME)).dtb \
+	$(BINARIES_DIR)/bl2.dtb;
+endef
+endif
+
+ifeq ($(BR2_TARGET_MA35D1_SECURE_BOOT),y)
+ARM_TRUSTED_FIRMWARE_MAKE_OPTS += FIP_DE_AES=1
+endif
 ARM_TRUSTED_FIRMWARE_MAKE_TARGETS += \
 	$(call qstrip,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_ADDITIONAL_TARGETS))
+
+ifeq ($(call qstrip,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_PLATFORM)),ma35d1)
+ifeq ($(call qstrip,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_ADDITIONAL_VARIABLES)),)
+ifeq ($(TFA_CPU800_WB128M),y)
+	BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME="ma35d1-cpu800-wb-128m"
+else ifeq ($(TFA_CPU800_WB256M),y)
+	BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME="ma35d1-cpu800-wb-256m"
+else ifeq ($(TFA_CPU800_WB512M),y)
+	BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME="ma35d1-cpu800-wb-512m"
+else ifeq ($(TFA_CPU800_WB1G),y)
+        BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME="ma35d1-cpu800-wb-1g"
+else ifeq ($(TFA_CPU800_WB2G),y)
+        BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME="ma35d1-cpu800-wb-2g"
+else ifeq ($(TFA_CPU1G_WB256M),y)
+	BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME="ma35d1-cpu1g-wb-256m"
+else ifeq ($(TFA_CPU1G_WB512M),y)
+	BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME="ma35d1-cpu1g-wb-512m"
+else ifeq ($(TFA_CPU1G_WB1G),y)
+        BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME="ma35d1-cpu1g-wb-1g"
+else ifeq ($(TFA_CPU1G_WB2G),y)
+        BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME="ma35d1-cpu1g-wb-2g"
+else ifeq ($(TFA_CPU800_MC1G),y)
+	BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME="ma35d1-cpu800-mc-1g"
+else ifeq ($(TFA_CPU1G_MC1G),y)
+	BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME="ma35d1-cpu1g-mc-1g"
+else ifeq ($(TFA_CPU800_CUSTOM_DDR),y)
+	BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME="ma35d1-cpu800-custom-ddr"
+else ifeq ($(TFA_CPU1G_CUSTOM_DDR),y)
+	BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME="ma35d1-cpu1g-custom-ddr"
+endif
+
+ifneq ($(call findstring,128,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME)),)
+	ARM_TRUSTED_FIRMWARE_MAKE_OPTS += MA35D1_DRAM_SIZE=0x07800000 MA35D1_DDR_MAX_SIZE=0x08000000 \
+					  MA35D1_DRAM_S_BASE=0x87800000 MA35D1_BL32_BASE=0x87800000
+else ifneq ($(call findstring,256,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME)),)
+	ARM_TRUSTED_FIRMWARE_MAKE_OPTS += MA35D1_DRAM_SIZE=0x0F800000 MA35D1_DDR_MAX_SIZE=0x10000000 \
+					  MA35D1_DRAM_S_BASE=0x8F800000 MA35D1_BL32_BASE=0x8F800000
+else ifneq ($(call findstring,512,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME)),)
+	ARM_TRUSTED_FIRMWARE_MAKE_OPTS += MA35D1_DRAM_SIZE=0x1F800000 MA35D1_DDR_MAX_SIZE=0x20000000 \
+					  MA35D1_DRAM_S_BASE=0x9F800000 MA35D1_BL32_BASE=0x9F800000
+else ifneq ($(call findstring,1g,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME)),)
+	ARM_TRUSTED_FIRMWARE_MAKE_OPTS += MA35D1_DRAM_SIZE=0x3F800000 MA35D1_DDR_MAX_SIZE=0x40000000 \
+                                          MA35D1_DRAM_S_BASE=0xBF800000 MA35D1_BL32_BASE=0xBF800000
+else ifneq ($(call findstring,custom,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_INTREE_DTS_NAME)),)
+        ARM_TRUSTED_FIRMWARE_MAKE_OPTS += MA35D1_DRAM_SIZE=${DSIZE} \
+					  MA35D1_DDR_MAX_SIZE=$(TFA_CUSTOM_DDR_SIZE) \
+					  MA35D1_DRAM_S_BASE=${SBASE} \
+					  MA35D1_BL32_BASE=${SBASE}
+else
+	ARM_TRUSTED_FIRMWARE_MAKE_OPTS += MA35D1_DRAM_SIZE=0x7F800000 MA35D1_DDR_MAX_SIZE=0x80000000 \
+					  MA35D1_DRAM_S_BASE=0xFF800000 MA35D1_BL32_BASE=0xFF800000
+endif
+endif
+endif
+
+ifeq ($(TFA_MA35D1_PMIC_0),y)
+ARM_TRUSTED_FIRMWARE_MAKE_OPTS += MA35D1_PMIC=0 MA35D1_CPU_CORE=$(TFA_MA35D1_CPU_CORE_POWER)
+else ifeq ($(TFA_MA35D1_PMIC_1),y)
+ARM_TRUSTED_FIRMWARE_MAKE_OPTS += MA35D1_PMIC=1 MA35D1_CPU_CORE=$(TFA_MA35D1_CPU_CORE_POWER)
+else ifeq ($(TFA_MA35D1_PMIC_2),y)
+ARM_TRUSTED_FIRMWARE_MAKE_OPTS += MA35D1_PMIC=2 MA35D1_CPU_CORE=$(TFA_MA35D1_CPU_CORE_POWER)
+else ifeq ($(TFA_MA35D1_PMIC_3),y)
+ARM_TRUSTED_FIRMWARE_MAKE_OPTS += MA35D1_PMIC=3 MA35D1_CPU_CORE=$(TFA_MA35D1_CPU_CORE_POWER)
+endif
+
+
+define ARM_TRUSTED_FIRMWARE_BUILD_FIP
+	if [ "${BR2_TARGET_MA35D1_SECURE_BOOT}" == "y" ]; then \
+		cd ${BINARIES_DIR}; \
+		if [ -d ${BINARIES_DIR}/fip ]; then \
+			rm ${BINARIES_DIR}/fip -rf; \
+		fi; \
+		mkdir ${BINARIES_DIR}/fip; \
+		cat ${TOPDIR}/board/nuvoton/ma35d1/nuwriter/en_fip.json | \
+		${HOST_DIR}/bin/jq -r ".header.aeskey = \"${BR2_TARGET_MA35D1_AES_KEY}\"" | \
+		${HOST_DIR}/bin/jq -r ".header.ecdsakey = \"${BR2_TARGET_MA35D1_ECDSA_KEY}\"" \
+		> ${BINARIES_DIR}/fip/en_fip.json; \
+		if [ "${BR2_TARGET_ARM_TRUSTED_FIRMWARE_BL31}" == "y" ]; then \
+			cp ${ARM_TRUSTED_FIRMWARE_IMG_DIR}/bl31.bin ${BINARIES_DIR}/fip/enc.bin; \
+			${HOST_DIR}/bin/python3 ${HOST_DIR}/bin/nuwriter.py -c ${BINARIES_DIR}/fip/en_fip.json>/dev/null; \
+			cat conv/enc_enc.bin conv/header.bin >${BINARIES_DIR}/fip/enc_bl31.bin; \
+			rm -rf `date "+%m%d-*"` conv pack; \
+		fi; \
+		if [ "${BR2_TARGET_ARM_TRUSTED_FIRMWARE_UBOOT_AS_BL33}" == "y" ]; then \
+			cp ${BINARIES_DIR}/${BR2_TARGET_ARM_TRUSTED_FIRMWARE_UBOOT_BL33_IMAGE} ${BINARIES_DIR}/fip/enc.bin; \
+			${HOST_DIR}/bin/python3 ${HOST_DIR}/bin/nuwriter.py -c ${BINARIES_DIR}/fip/en_fip.json>/dev/null; \
+			cat conv/enc_enc.bin conv/header.bin >${BINARIES_DIR}/fip/enc_u-boot.bin; \
+			rm -rf `date "+%m%d-*"` conv pack; \
+		fi; \
+		if [ "${BR2_TARGET_ARM_TRUSTED_FIRMWARE_BL32_OPTEE}" == "y" ]; then \
+			cp $(BINARIES_DIR)/tee-header_v2.bin ${BINARIES_DIR}/fip/enc.bin; \
+			${HOST_DIR}/bin/python3 ${HOST_DIR}/bin/nuwriter.py -c ${BINARIES_DIR}/fip/en_fip.json; \
+			cat conv/enc_enc.bin conv/header.bin >${BINARIES_DIR}/fip/enc_tee-header_v2.bin; \
+			rm -rf `date "+%m%d-*"` conv pack; \
+			cp $(BINARIES_DIR)/tee-pager_v2.bin ${BINARIES_DIR}/fip/enc.bin; \
+			${HOST_DIR}/bin/python3 ${HOST_DIR}/bin/nuwriter.py -c ${BINARIES_DIR}/fip/en_fip.json>/dev/null; \
+			cat conv/enc_enc.bin conv/header.bin >${BINARIES_DIR}/fip/enc_tee-pager_v2.bin; \
+			rm -rf `date "+%m%d-*"` conv pack; \
+		fi; \
+		if [ "${BR2_TARGET_ARM_TRUSTED_FIRMWARE_LOAD_SCP_BL2}" == "y" ]; then \
+			cp $(BINARIES_DIR)/$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_SCP_URL) ${BINARIES_DIR}/fip/enc.bin; \
+			${HOST_DIR}/bin/python3 ${HOST_DIR}/bin/nuwriter.py -c ${BINARIES_DIR}/fip/en_fip.json>/dev/null; \
+			cat conv/enc_enc.bin conv/header.bin >${BINARIES_DIR}/fip/enc_rtp.bin; \
+			rm -rf `date "+%m%d-*"` conv pack; \
+		fi; \
+		rm ${BINARIES_DIR}/fip/enc.bin ${BINARIES_DIR}/fip/en_fip.json; \
+		if test -f $(@D)/tools/fiptool/fiptool; then \
+			$(@D)/tools/fiptool/fiptool create \
+			${ARM_TRUSTED_FIRMWARE_FIP_OPTS} \
+			$(ARM_TRUSTED_FIRMWARE_IMG_DIR)/fip.bin; \
+		fi; \
+	fi
+endef
 
 ARM_TRUSTED_FIRMWARE_CUSTOM_DTS_PATH = $(call qstrip,$(BR2_TARGET_ARM_TRUSTED_FIRMWARE_CUSTOM_DTS_PATH))
 
@@ -212,6 +366,7 @@ define ARM_TRUSTED_FIRMWARE_INSTALL_IMAGES_CMDS
 	)
 	$(ARM_TRUSTED_FIRMWARE_BL31_UBOOT_INSTALL)
 	$(ARM_TRUSTED_FIRMWARE_BL31_UBOOT_INSTALL_ELF)
+	$(ARM_TRUSTED_FIRMWARE_BL2_DTB_INSTALL)
 endef
 
 # Configuration check
