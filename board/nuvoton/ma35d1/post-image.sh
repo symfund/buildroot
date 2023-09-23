@@ -237,11 +237,19 @@ IMAGE_CMD_sdcard()
 	
         # Initialize a sparse file
         dd if=/dev/zero of=${SDCARD} bs=1 count=0 seek=$((1024*$SDCARD_SIZE)) &>${NULLDEV}
-	${HOST_DIR}/bin/fakeroot -u ${HOST_DIR}/sbin/parted ${SDCARD} -s mklabel msdos
-	${HOST_DIR}/bin/fakeroot -u ${HOST_DIR}/sbin/parted ${SDCARD} -s unit KiB mkpart primary \
-		$(($BOOT_SPACE_ALIGNED)) \
-        	$(($BOOT_SPACE_ALIGNED+$IMAGE_ROOTFS_ALIGNMENT+$EXT2_SIZE))
-	${HOST_DIR}/bin/fakeroot -u ${HOST_DIR}/sbin/parted ${SDCARD} print
+
+	rm -f output/images/format-sdcard.sh
+	cat > output/images/format-sdcard.sh <<__EOF
+#!/bin/sh
+${HOST_DIR}/sbin/parted ${SDCARD} -s mklabel msdos
+${HOST_DIR}/sbin/parted ${SDCARD} -s unit KiB mkpart primary \
+	$(($BOOT_SPACE_ALIGNED)) \
+       	$(($BOOT_SPACE_ALIGNED+$IMAGE_ROOTFS_ALIGNMENT+$EXT2_SIZE))
+${HOST_DIR}/sbin/parted ${SDCARD} print
+__EOF
+	chmod +x output/images/format-sdcard.sh
+	PATH=${HOST_DIR}/bin:${HOST_DIR}/sbin:$PATH FAKEROOTDONTTRYCHOWN=1 ${HOST_DIR}/bin/fakeroot -- output/images/format-sdcard.sh
+	rm -f output/images/format-sdcard.sh
 
         # MBR table for nuwriter
 	dd if=/dev/zero of=${BINARIES_DIR}/MBR.sdcard.bin bs=1 count=0 seek=512 &>${NULLDEV}
