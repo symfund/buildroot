@@ -7,6 +7,7 @@ config BR2_PACKAGE_SHAIRPORT_SYNC
 	select BR2_PACKAGE_LIBCONFIG
 	select BR2_PACKAGE_OPENSSL if !BR2_PACKAGE_MBEDTLS
 	select BR2_PACKAGE_POPT
+	select BR2_PACKAGE_NQPTP
 	help
 	  Shairport Sync emulates an AirPort Express for the purpose
 	  of streaming audio from iTunes, iPods, iPhones, iPads and
@@ -19,6 +20,20 @@ config BR2_PACKAGE_SHAIRPORT_SYNC
 	  https://github.com/mikebrady/shairport-sync
 
 if BR2_PACKAGE_SHAIRPORT_SYNC
+
+config BR2_PACKAGE_SHAIRPOT_SYNC_AIRPLAY2
+	bool "airplay 2 support"
+	select BR2_PACKAGE_LIBPLIST
+	select BR2_PACKAGE_LIBSODIUM
+	select BR2_PACKAGE_LIBGCRYPT
+	help
+	  Enable AirPlay 2 support.
+
+config BR2_PACKAGE_SHAIRPORT_SYNC_APPLE_ALAC
+	bool "apple alac support"
+	select BR2_PACKAGE_LIBALAC
+	help
+	  Enable Apple ALAC support
 
 config BR2_PACKAGE_SHAIRPORT_SYNC_CONVOLUTION
 	bool "convolution support"

@@ -1,5 +1,7 @@
 config BR2_PACKAGE_NQPTP
 	bool "nqptp"
+	select BR2_PACKAGE_LIBCAP
+	select BR2_PACKAGE_LIBCAP_TOOLS
 	help
 	  NQPTP - Not Quite PTP
 

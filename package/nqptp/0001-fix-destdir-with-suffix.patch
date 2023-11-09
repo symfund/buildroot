@@ -6,7 +6,7 @@ diff -urN a/Makefile.am b/Makefile.am
  if BUILD_FOR_LINUX
  # NQPTP runs as user/group nqptp/nqptp on Linux and uses setcap to access ports 319 and 320
 -	setcap 'cap_net_bind_service=+ep' $(bindir)/nqptp
-+	sudo setcap 'cap_net_bind_service=+ep' $(DESTDIR)$(bindir)/nqptp
++	echo "setcap 'cap_net_bind_service=+ep' $(DESTDIR)$(bindir)/nqptp"
  # no installer for System V
  if INSTALL_SYSTEMD_STARTUP
  	getent group nqptp &>/dev/null || groupadd -r nqptp &>/dev/null
