@@ -1,0 +1,22 @@
+diff -urN a/sys/v4l2/gstv4l2bufferpool.c b/sys/v4l2/gstv4l2bufferpool.c
+--- a/sys/v4l2/gstv4l2bufferpool.c	2023-04-12 00:29:28.000000000 +0800
++++ b/sys/v4l2/gstv4l2bufferpool.c	2023-11-20 09:26:59.684224782 +0800
+@@ -1030,10 +1030,18 @@
+   GstV4l2BufferPool *pool;
+   gboolean ret;
+ 
++  if (bpool == NULL) {
++  	return FALSE;
++  }
++
+   g_return_val_if_fail (bpool, FALSE);
+ 
+   pool = GST_V4L2_BUFFER_POOL (bpool);
+ 
++  if (pool == NULL) {
++	return FALSE;
++  }
++
+   if (pool->orphaned != FALSE
+       || !GST_V4L2_ALLOCATOR_CAN_ORPHAN_BUFS (pool->vallocator)
+       || g_getenv ("GST_V4L2_FORCE_DRAIN")) {
