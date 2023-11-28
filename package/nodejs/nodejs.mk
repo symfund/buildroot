@@ -46,14 +46,16 @@ HOST_NODEJS_MAKE_OPTS = \
 	CXXFLAGS="$(HOST_NODEJS_CXXFLAGS)" \
 	LDFLAGS.host="$(HOST_LDFLAGS)" \
 	NO_LOAD=cctest.target.mk \
-	PATH=$(@D)/bin:$(BR_PATH)
+	PATH=$(@D)/bin:$(BR_PATH) \
+	JOBS=$(PARALLEL_JOBS)
 
 NODEJS_MAKE_OPTS = \
 	$(TARGET_CONFIGURE_OPTS) \
 	NO_LOAD=cctest.target.mk \
 	PATH=$(@D)/bin:$(BR_PATH) \
 	LDFLAGS="$(NODEJS_LDFLAGS)" \
-	LD="$(TARGET_CXX)"
+	LD="$(TARGET_CXX)" \
+	JOBS=$(PARALLEL_JOBS)
 
 # nodejs's build system uses python which can be a symlink to an unsupported
 # python version (e.g. python 3.10 with nodejs 14.18.1). We work around this by
@@ -246,6 +248,9 @@ define NODEJS_INSTALL_MODULES
 	# help in diagnosing the problem.
 	$(NPM) install -g $(NODEJS_MODULES_LIST)
 endef
+
+# Exclude prebuilt binaries with different architectures and OS from check
+NODEJS_BIN_ARCH_EXCLUDE = /usr/lib/node_modules/
 endif
 
 define NODEJS_INSTALL_STAGING_CMDS

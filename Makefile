@@ -90,9 +90,9 @@ all:
 .PHONY: all
 
 # Set and export the version string
-export BR2_VERSION := 2023.02.4
+export BR2_VERSION := 2023.02.7
 # Actual time the release is cut (for reproducible builds)
-BR2_VERSION_EPOCH = 1693507700
+BR2_VERSION_EPOCH = 1699991000
 
 # Save running make version since it's clobbered by the make package
 RUNNING_MAKE_VERSION := $(MAKE_VERSION)
@@ -598,6 +598,7 @@ prepare-sdk: world
 	@$(call MESSAGE,"Rendering the SDK relocatable")
 	PER_PACKAGE_DIR=$(PER_PACKAGE_DIR) $(TOPDIR)/support/scripts/fix-rpath host
 	PER_PACKAGE_DIR=$(PER_PACKAGE_DIR) $(TOPDIR)/support/scripts/fix-rpath staging
+	$(call ppd-fixup-paths,$(BASE_DIR))
 	$(INSTALL) -m 755 $(TOPDIR)/support/misc/relocate-sdk.sh $(HOST_DIR)/relocate-sdk.sh
 	mkdir -p $(HOST_DIR)/share/buildroot
 	echo $(HOST_DIR) > $(HOST_DIR)/share/buildroot/sdk-location
@@ -714,7 +715,7 @@ STAGING_DIR_FILES_LISTS = $(sort $(wildcard $(BUILD_DIR)/*/.files-list-staging.t
 .PHONY: host-finalize
 host-finalize: $(PACKAGES) $(HOST_DIR) $(HOST_DIR_SYMLINK)
 	@$(call MESSAGE,"Finalizing host directory")
-	$(call per-package-rsync,$(sort $(PACKAGES)),host,$(HOST_DIR))
+	$(call per-package-rsync,$(sort $(PACKAGES)),host,$(HOST_DIR),copy)
 
 .PHONY: staging-finalize
 staging-finalize: $(STAGING_DIR_SYMLINK)
@@ -722,7 +723,7 @@ staging-finalize: $(STAGING_DIR_SYMLINK)
 .PHONY: target-finalize
 target-finalize: $(PACKAGES) $(TARGET_DIR) host-finalize
 	@$(call MESSAGE,"Finalizing target directory")
-	$(call per-package-rsync,$(sort $(PACKAGES)),target,$(TARGET_DIR))
+	$(call per-package-rsync,$(sort $(PACKAGES)),target,$(TARGET_DIR),copy)
 	$(foreach hook,$(TARGET_FINALIZE_HOOKS),$($(hook))$(sep))
 	rm -rf $(TARGET_DIR)/usr/include $(TARGET_DIR)/usr/share/aclocal \
 		$(TARGET_DIR)/usr/lib/pkgconfig $(TARGET_DIR)/usr/share/pkgconfig \
@@ -833,7 +834,7 @@ legal-info-clean:
 .PHONY: legal-info-prepare
 legal-info-prepare: $(LEGAL_INFO_DIR)
 	@$(call MESSAGE,"Buildroot $(BR2_VERSION_FULL) Collecting legal info")
-	@$(call legal-license-file,buildroot,buildroot,support/legal-info/buildroot.hash,COPYING,COPYING,HOST)
+	@$(call legal-license-file,HOST,buildroot,buildroot,COPYING,COPYING,support/legal-info/buildroot.hash)
 	@$(call legal-manifest,TARGET,PACKAGE,VERSION,LICENSE,LICENSE FILES,SOURCE ARCHIVE,SOURCE SITE,DEPENDENCIES WITH LICENSES)
 	@$(call legal-manifest,HOST,PACKAGE,VERSION,LICENSE,LICENSE FILES,SOURCE ARCHIVE,SOURCE SITE,DEPENDENCIES WITH LICENSES)
 	@$(call legal-manifest,HOST,buildroot,$(BR2_VERSION_FULL),GPL-2.0+,COPYING,not saved,not saved)
@@ -1271,5 +1272,8 @@ include docs/manual/manual.mk
 -include $(foreach dir,$(BR2_EXTERNAL_DIRS),$(sort $(wildcard $(dir)/docs/*/*.mk)))
 
 .PHONY: $(noconfig_targets)
+
+# .WAIT was introduced in make 4.4. For older make, define it as phony.
+.PHONY: .WAIT
 
 endif #umask / $(CURDIR) / $(O)
