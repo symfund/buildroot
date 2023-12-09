@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-WESTON_VERSION = 10.0.1
+WESTON_VERSION = 10.0.5
 WESTON_SITE = https://gitlab.freedesktop.org/wayland/weston/-/releases/$(WESTON_VERSION)/downloads
 WESTON_SOURCE = weston-$(WESTON_VERSION).tar.xz
 WESTON_LICENSE = MIT
@@ -97,6 +97,14 @@ ifeq ($(BR2_PACKAGE_WESTON_DRM),y)
 WESTON_CONF_OPTS += -Dbackend-drm=true
 else
 WESTON_CONF_OPTS += -Dbackend-drm=false
+endif
+
+ifeq ($(BR2_PACKAGE_WESTON_FBDEV),y)
+WESTON_CONF_OPTS += -Dbackend-fbdev=true
+WESTON_CONF_OPTS += -Ddeprecated-backend-fbdev=true
+else
+WESTON_CONF_OPTS += -Dbackend-fbdev=false
+WESTON_CONF_OPTS += -Ddeprecated-backend-fbdev=false
 endif
 
 ifeq ($(BR2_PACKAGE_WESTON_HEADLESS),y)
