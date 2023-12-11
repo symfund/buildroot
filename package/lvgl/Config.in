@@ -1,0 +1,23 @@
+config BR2_PACKAGE_LVGL
+	bool "lvgl"
+	select BR2_PACKAGE_HOST_CMAKE
+
+if BR2_PACKAGE_LVGL
+choice
+	prompt "default touchscreen type"
+
+config BR2_PACKAGE_LVGL_DEFAULT_CAPACITIVE_TOUCHSCREEN
+        bool "capacitive"
+        select BR2_PACKAGE_LVGL_CAPACITIVE_TOUCHSCREEN
+
+config BR2_PACKAGE_LVGL_DEFAULT_RESISTIVE_TOUCHSCREEN
+	bool "resistive"
+	select BR2_PACKAGE_LVGL_RESISTIVE_TOUCHSCREEN
+
+endchoice
+endif
+
+config BR2_PACKAGE_LVGL_DEFAULT_TOUCHSCREEN
+	string
+	default "capacitive" if BR2_PACKAGE_LVGL_CAPACITIVE_TOUCHSCREEN
+	default "resistive" if BR2_PACKAGE_LVGL_RESISTIVE_TOUCHSCREEN

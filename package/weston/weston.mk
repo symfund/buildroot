@@ -195,4 +195,23 @@ else
 WESTON_CONF_OPTS += -Ddemo-clients=false
 endif
 
+define WESTON_TARGET_INSTALL_CMD
+	$(INSTALL) -m 0755 -D $(WESTON_PKGDIR)/weston.sh \
+                $(TARGET_DIR)/etc/profile.d/weston.sh
+	$(INSTALL) -m 0755 -D $(WESTON_PKGDIR)/weston.ini \
+                $(TARGET_DIR)/etc/xdg/weston/weston.ini
+endef
+
+WESTON_POST_INSTALL_TARGET_HOOKS += WESTON_TARGET_INSTALL_CMD
+
+ifeq ($(BR2_PACKAGE_LVGL_DEFAULT_RESISTIVE_TOUCHSCREEN),y)
+define WESTON_CONFIG_RESISTIVE_TOUCHSCREEN
+	$(INSTALL) -m 0755 -D $(WESTON_PKGDIR)/save-resistive-touch-calibration.sh \
+                  $(TARGET_DIR)/etc/xdg/save-resistive-touch-calibration.sh
+	$(SED) 's/^touchscreen_calibrator=.*/touchscreen_calibrator=true/g'  $(TARGET_DIR)/etc/xdg/weston/weston.ini
+	$(SED) 's/^USING_RESISTIVE_TOUCHSCREEN=.*/USING_RESISTIVE_TOUCHSCREEN=1/g' $(TARGET_DIR)/etc/profile.d/weston.sh
+endef
+WESTON_POST_INSTALL_TARGET_HOOKS += WESTON_CONFIG_RESISTIVE_TOUCHSCREEN
+endif
+
 $(eval $(meson-package))
