@@ -19,7 +19,7 @@ fi
 
 # weston 9.0.0, display_id=0
 # weston 10.0.0, display_id=1
-display_id=0
+display_id=1
 
 export WAYLAND_DISPLAY=wayland-${display_id}
 
