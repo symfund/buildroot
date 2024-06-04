@@ -1,6 +1,27 @@
-================================
-THIS REPOSITORY WILL BE RETIRED.
-================================
+THIS repository was RETIRED. Please use the below repository for Airplay video mirroring.
+https://github.com/OpenNuvoton/buildroot_2024.git
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 Buildroot is a simple, efficient and easy-to-use tool to generate embedded
 Linux systems through cross-compilation.
